@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 		if(strcmp(argv[i],"-d") == 0 && dp == -1) dp = i;
 		if(strcmp(argv[i],"--") == 0 && mm == -1) mm = i;
 	}
-	while ((opt = getopt(argc, argv, "dp@:")) != -1) 
+	while ((opt = getopt(argc, argv, "d:p:")) != -1) 
 	{
                switch (opt) {
                case 'p':
@@ -42,13 +42,15 @@ int main(int argc, char **argv)
 				exit(1);
 			   }
 			   char real_name[100];
-			   realpath(argv[optind],real_name);
+			   //realpath(argv[optind],real_name);
+			   realpath(optarg,real_name);
 			   strcat(real_name, "/sandbox.so");
 			   setenv("sandplace",real_name,1);
-			   DIR* dir = opendir(real_name);
-			   if (!dir)
+			   //FILE *file = fopen(real_name,"r");
+			   int file = open(real_name,O_RDONLY);
+			   if (file== -1)
 			   {
-				   fprintf(stderr, "[sandbox] .so doesn't exist\n");
+				   fprintf(stderr, "[sandbox] .so not found\n");
 				   exit(1);
 			   }
 		   }
@@ -61,11 +63,13 @@ int main(int argc, char **argv)
 			fprintf(stderr,"usage: ./sandbox [-p sopath] [-d basedir] [--] cmd [cmd args ...]\n-p: set the path to sandbox.so, default = ./sandbox.so\n-d: restrict directory, default = .\n--: seperate the arguments for sandbox and for the executed command\n");
 			   exit(1);
 			   }
-			   setenv("dir",argv[optind],1);
-			   DIR* dir = opendir(argv[optind]);
+			   char real_name[100];
+			   setenv("dir",optarg,1);
+			   realpath(optarg,real_name);
+			   DIR* dir = opendir(real_name);
 			   if (!dir)
 			   {
-				   fprintf(stderr, "[sandbox] dir doesn't exist\n");
+				   fprintf(stderr, "[sandbox] dir not found\n");
 				   exit(1);
 			   }
 
