@@ -1,5 +1,5 @@
 CC:=g++
-exe:=hw2
+exe:=sandbox
 obj:=main.o
 san:=sandbox.so
 

@@ -28,17 +28,19 @@ typedef int (*old_rmdir)(const char *name);
 typedef int (*old_symlink)(const char *target, const char *linkpath);
 typedef int (*old_unlink)(const char *name);
 typedef int (*old_xstat)(int ver, const char *path, struct stat *stat_buf);
+typedef int (*old_xstat64)(int ver, const char *path, struct stat64 *stat_buf);
 char limit[1000];
 char *bg;
 int see_in_dir(const char *place, const char *name)
 {
 	char real_name[100];
 	bg = getenv("dir");
+	//bg = ".";
 	realpath(bg,limit);
 	realpath(name,real_name);
 	if(strncmp(real_name, limit, strlen(limit)) != 0) 
 	{
-		printf("[sandbox] %s: access to %s is not allowed\n", place,name);
+		fprintf(stderr,"[sandbox] %s: access to %s is not allowed\n", place,name);
 		return 0;
 	}
 	return 1;
@@ -71,6 +73,13 @@ int chown(const char *name, uid_t owner, gid_t group)
 	orig_open = (old_chown) dlsym(RTLD_NEXT,"chown");
 	return orig_open(name, owner, group);
 }
+FILE *fopen64(const char*name, const char*mode)
+{
+	if(see_in_dir("fopen64",name) == 0) return NULL;
+	old_fopen orig_open;
+	orig_open = (old_fopen) dlsym(RTLD_NEXT,"fopen64");
+	return orig_open(name, mode);
+}
 FILE *fopen(const char*name, const char*mode)
 {
 	if(see_in_dir("fopen",name) == 0) return NULL;
@@ -86,6 +95,13 @@ int link(const char*oldpath, const char *newpath)
 	orig_open = (old_link) dlsym(RTLD_NEXT,"link");
 	return orig_open(oldpath, newpath);
 }
+int creat64(const char* name, mode_t mode)
+{
+	if(see_in_dir("creat64",name) == 0) return -1;
+	old_creat orig_open;
+	orig_open = (old_creat) dlsym(RTLD_NEXT,"creat64");
+	return orig_open(name, mode);
+}
 int creat(const char* name, mode_t mode)
 {
 	if(see_in_dir("creat",name) == 0) return -1;
@@ -99,6 +115,25 @@ int mkdir(const char *name, mode_t mode)
 	old_mkdir orig_open;
 	orig_open = (old_mkdir) dlsym(RTLD_NEXT,"mkdir");
 	return orig_open(name, mode);
+}
+int open64(const char *name, int flags, ...)
+{
+	va_list ap;
+	int args;
+	int argn = 0;
+	int flag;
+	va_start(ap, flags);
+	flag = flags;
+	mode_t mode;
+	mode = va_arg(ap, mode_t);
+	va_end(ap);
+	if(see_in_dir("open64",name) == 0) return -1;
+	old_open orig_open;
+	old_open0 orig_open0;
+	orig_open = (old_open) dlsym(RTLD_NEXT,"open64");
+	orig_open0 = (old_open0) dlsym(RTLD_NEXT,"open64");
+	if(mode>=0 && mode <=777)  return orig_open0(name, flag, mode);
+	else return orig_open(name,flag);
 }
 int open(const char *name, int flags, ...)
 {
@@ -118,6 +153,25 @@ int open(const char *name, int flags, ...)
 	orig_open0 = (old_open0) dlsym(RTLD_NEXT,"open");
 	if(mode>=0 && mode <=777)  return orig_open0(name, flag, mode);
 	else return orig_open(name,flag);
+}
+int openat64(int dirfd, const char *name, int flags, ...)
+{
+	va_list ap;
+	int args;
+	int argn = 0;
+	int flag;
+	va_start(ap, flags);
+	flag = flags;
+	mode_t mode;
+	mode = va_arg(ap, mode_t);
+	va_end(ap);
+	if(see_in_dir("openat64",name) == 0) return -1;
+	old_openat orig_open;
+	orig_open = (old_openat) dlsym(RTLD_NEXT,"openat64");
+	old_openat0 orig_open0;
+	orig_open0 = (old_openat0) dlsym(RTLD_NEXT,"openat64");
+	if(mode>=0 && mode <=777)  return orig_open0(dirfd, name, flag, mode);
+	else return orig_open(dirfd,name,flag);
 }
 int openat(int dirfd, const char *name, int flags, ...)
 {
@@ -169,8 +223,7 @@ int rmdir(const char *name)
 }
 int symlink(const char *target, const char *linkpath)
 {
-	if(see_in_dir("symlink",target) == 0) return -1;
-	else if(see_in_dir("symlink",linkpath) == 0) return -1;
+	if(see_in_dir("symlink",linkpath) == 0) return -1;
 	old_symlink orig_open;
 	orig_open = (old_symlink) dlsym(RTLD_NEXT,"symlink");
 	return orig_open(target, linkpath);
@@ -184,31 +237,31 @@ int unlink(const char *name)
 }
 int execl(const char *path, const char *arg, ...)
 {
-	printf("[sandbox] execl(%s): not allowed\n",arg);
+	fprintf(stderr,"[sandbox] execl(%s): not allowed\n",arg);
 }
 int execlp(const char *path, const char *arg, ...)
 {
-	printf("[sandbox] execlp(%s): not allowed\n",arg);
+	fprintf(stderr,"[sandbox] execlp(%s): not allowed\n",arg);
 }
 int execle(const char *path, const char *arg, ...)
 {
-	printf("[sandbox] execle(%s): not allowed\n",arg);
+	fprintf(stderr,"[sandbox] execle(%s): not allowed\n",arg);
 }
 int execv(const char *path, char *const argv[])
 {
-	printf("[sandbox] execv(%s): not allowed\n",argv[0]);
+	fprintf(stderr,"[sandbox] execv(%s): not allowed\n",argv[0]);
 }
 int execvp(const char *file, char *const argv[])
 {
-	printf("[sandbox] execvp(%s): not allowed\n",argv[0]);
+	fprintf(stderr,"[sandbox] execvp(%s): not allowed\n",argv[0]);
 }
 int execve(const char *filename, char *const argv[], char *const envp[])
 {
-	printf("[sandbox] execve(%s): not allowed\n",argv[0]);
+	fprintf(stderr,"[sandbox] execve(%s): not allowed\n",argv[0]);
 }
 int system(const char *command)
 {
-	printf("[sandbox] system(%s): not allowed\n",command);
+	fprintf(stderr,"[sandbox] system(%s): not allowed\n",command);
 	return 0;
 }
 int __xstat(int ver, const char *name, struct stat *stat_buf)
@@ -216,5 +269,26 @@ int __xstat(int ver, const char *name, struct stat *stat_buf)
 	if(see_in_dir("__xstat",name) == 0) return -1;
 	old_xstat orig_open;
 	orig_open = (old_xstat) dlsym(RTLD_NEXT,"__xstat");
+	return orig_open(ver,name,stat_buf);
+}
+int __xstat64(int ver, const char * name, struct stat64 * stat_buf)
+{
+	if(see_in_dir("__xstat64",name) == 0) return -1;
+	old_xstat64 orig_open;
+	orig_open = (old_xstat64) dlsym(RTLD_NEXT,"__xstat64");
+	return orig_open(ver,name,stat_buf);
+}
+int __lxstat(int ver, const char *name, struct stat *stat_buf)
+{
+	if(see_in_dir("__lxstat",name) == 0) return -1;
+	old_xstat orig_open;
+	orig_open = (old_xstat) dlsym(RTLD_NEXT,"__lxstat");
+	return orig_open(ver,name,stat_buf);
+}
+int __lxstat64(int ver, const char * name, struct stat64 * stat_buf)
+{
+	if(see_in_dir("__lxstat64",name) == 0) return -1;
+	old_xstat64 orig_open;
+	orig_open = (old_xstat64) dlsym(RTLD_NEXT,"__lxstat64");
 	return orig_open(ver,name,stat_buf);
 }
